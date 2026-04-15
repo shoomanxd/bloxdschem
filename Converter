@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bloxd → .schematic Converter</title>
+<style>
+  body { font-family: monospace; background: #1a1a2e; color: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  h1 { color: #a78bfa; margin-bottom: 8px; }
+  p { color: #aaa; margin-bottom: 24px; font-size: 14px; }
+  label { background: #4c1d95; color: #fff; padding: 12px 28px; border-radius: 8px; cursor: pointer; font-size: 16px; transition: background 0.2s; }
+  label:hover { background: #6d28d9; }
+  input[type=file] { display: none; }
+  #status { margin-top: 20px; font-size: 14px; color: #86efac; min-height: 22px; }
+  #err { color: #f87171; margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Bloxd → .schematic</h1>
+<p>Pick a <strong>.bloxdschem</strong> file — it will download as a legacy MCEdit <strong>.schematic</strong></p>
+<label for="fileInput">Choose .bloxdschem file</label>
+<input type="file" id="fileInput" accept=".bloxdschem">
+<div id="status"></div>
+<div id="err"></div>
+
+<script>
+// ─── Bloxd block ID → MC block name mapping (b2mJson) ───────────────────────
+const B2M = {"Air":"air","Maple Log":"oak_log","Maple Wood Planks":"oak_planks","Maple Leaves":"oak_leaves","Maple Door":"oak_door","Maple Trapdoor":"oak_trapdoor","Maple Sapling":"oak_sapling","Maple Slab":"oak_slab","Barkless Maple Log":"stripped_oak_log","Maple Ladder":"ladder","Pine Log":"spruce_log","Pine Wood Planks":"spruce_planks","Pine Leaves":"spruce_leaves","Pine Door":"spruce_door","Pine Trapdoor":"spruce_trapdoor","Pine Sapling":"spruce_sapling","Pine Slab":"spruce_slab","Barkless Pine Log":"stripped_spruce_log","Pine Ladder":"ladder","Plum Log":"acacia_log","Plum Wood Planks":"acacia_planks","Plum Leaves":"acacia_leaves","Plum Door":"acacia_door","Plum Trapdoor":"acacia_trapdoor","Plum Sapling":"acacia_sapling","Plum Slab":"acacia_slab","Barkless Plum Log":"stripped_acacia_log","Cedar Log":"dark_oak_log","Cedar Wood Planks":"dark_oak_planks","Cedar Leaves":"dark_oak_leaves","Cedar Door":"dark_oak_door","Cedar Trapdoor":"dark_oak_trapdoor","Cedar Sapling":"dark_oak_sapling","Cedar Slab":"dark_oak_slab","Barkless Cedar Log":"stripped_dark_oak_log","Cedar Ladder":"ladder","Aspen Log":"birch_log","Aspen Wood Planks":"birch_planks","Aspen Leaves":"birch_leaves","Aspen Door":"birch_door","Aspen Trapdoor":"birch_trapdoor","Aspen Sapling":"birch_sapling","Aspen Slab":"birch_slab","Barkless Aspen Log":"stripped_birch_log","Aspen Ladder":"ladder","Elm Log":"jungle_log","Elm Wood Planks":"jungle_planks","Elm Leaves":"jungle_leaves","Elm Door":"jungle_door","Elm Trapdoor":"jungle_trapdoor","Elm Sapling":"jungle_sapling","Elm Slab":"jungle_slab","Barkless Elm Log":"stripped_jungle_log","Pear Log":"acacia_log","Pear Wood Planks":"acacia_planks","Pear Leaves":"acacia_leaves","Cherry Log":"cherry_log","Cherry Wood Planks":"cherry_planks","Cherry Leaves":"cherry_leaves","Cherry Door":"cherry_door","Cherry Trapdoor":"cherry_trapdoor","Cherry Sapling":"cherry_sapling","Cherry Slab":"cherry_slab","Barkless Cherry Log":"stripped_cherry_log","Cherry Ladder":"ladder","Palm Log":"jungle_log","Palm Wood Planks":"jungle_planks","Palm Leaves":"jungle_leaves","Stone":"stone","Messy Stone":"cobblestone","Mossy Messy Stone":"mossy_cobblestone","Smooth Stone":"smooth_stone","Engraved Stone":"chiseled_stone_bricks","Stone Bricks":"stone_bricks","Mossy Stone Bricks":"mossy_stone_bricks","Cracked Stone Bricks":"cracked_stone_bricks","Diorite":"diorite","Smooth Diorite":"polished_diorite","Andesite":"andesite","Smooth Andesite":"polished_andesite","Granite":"granite","Smooth Granite":"polished_granite","Coal Ore":"coal_ore","Iron Ore":"iron_ore","Gold Ore":"gold_ore","Lapis Lazuli Ore":"lapis_ore","Emerald Ore":"emerald_ore","Diamond Ore":"diamond_ore","Block of Coal":"coal_block","Block of Iron":"iron_block","Block of Gold":"gold_block","Block of Lapis Lazuli":"lapis_block","Block of Emerald":"emerald_block","Block of Diamond":"diamond_block","White Wool":"white_wool","White Baked Clay":"white_terracotta","White Concrete":"white_concrete","White Glass":"white_stained_glass","White Ceramic":"white_glazed_terracotta","White Carpet":"white_carpet","Orange Wool":"orange_wool","Orange Baked Clay":"orange_terracotta","Orange Concrete":"orange_concrete","Orange Glass":"orange_stained_glass","Orange Carpet":"orange_carpet","Magenta Wool":"magenta_wool","Magenta Baked Clay":"magenta_terracotta","Magenta Concrete":"magenta_concrete","Magenta Glass":"magenta_stained_glass","Magenta Carpet":"magenta_carpet","Light Blue Wool":"light_blue_wool","Light Blue Baked Clay":"light_blue_terracotta","Light Blue Concrete":"light_blue_concrete","Light Blue Glass":"light_blue_stained_glass","Light Blue Carpet":"light_blue_carpet","Yellow Wool":"yellow_wool","Yellow Baked Clay":"yellow_terracotta","Yellow Concrete":"yellow_concrete","Yellow Glass":"yellow_stained_glass","Yellow Carpet":"yellow_carpet","Lime Wool":"lime_wool","Lime Baked Clay":"lime_terracotta","Lime Concrete":"lime_concrete","Lime Glass":"lime_stained_glass","Lime Carpet":"lime_carpet","Pink Wool":"pink_wool","Pink Baked Clay":"pink_terracotta","Pink Concrete":"pink_concrete","Pink Glass":"pink_stained_glass","Pink Carpet":"pink_carpet","Gray Wool":"gray_wool","Gray Baked Clay":"gray_terracotta","Gray Concrete":"gray_concrete","Gray Glass":"gray_stained_glass","Gray Carpet":"gray_carpet","Light Gray Wool":"light_gray_wool","Light Gray Baked Clay":"light_gray_terracotta","Light Gray Concrete":"light_gray_concrete","Light Gray Glass":"light_gray_stained_glass","Light Gray Carpet":"light_gray_carpet","Cyan Wool":"cyan_wool","Cyan Baked Clay":"cyan_terracotta","Cyan Concrete":"cyan_concrete","Cyan Glass":"cyan_stained_glass","Cyan Carpet":"cyan_carpet","Purple Wool":"purple_wool","Purple Baked Clay":"purple_terracotta","Purple Concrete":"purple_concrete","Purple Glass":"purple_stained_glass","Purple Carpet":"purple_carpet","Blue Wool":"blue_wool","Blue Baked Clay":"blue_terracotta","Blue Concrete":"blue_concrete","Blue Glass":"blue_stained_glass","Blue Carpet":"blue_carpet","Brown Wool":"brown_wool","Brown Baked Clay":"brown_terracotta","Brown Concrete":"brown_concrete","Brown Glass":"brown_stained_glass","Brown Carpet":"brown_carpet","Green Wool":"green_wool","Green Baked Clay":"green_terracotta","Green Concrete":"green_concrete","Green Glass":"green_stained_glass","Green Carpet":"green_carpet","Red Wool":"red_wool","Red Baked Clay":"red_terracotta","Red Concrete":"red_concrete","Red Glass":"red_stained_glass","Red Carpet":"red_carpet","Black Wool":"black_wool","Black Baked Clay":"black_terracotta","Black Concrete":"black_concrete","Black Glass":"black_stained_glass","Black Carpet":"black_carpet","Baked Clay":"terracotta","Glass":"glass","Sandstone":"sandstone","Smooth Sandstone":"smooth_sandstone","Engraved Sandstone":"chiseled_sandstone","Sandstone Bricks":"cut_sandstone","Red Sandstone":"red_sandstone","Smooth Red Sandstone":"smooth_red_sandstone","Bricks":"bricks","Obsidian":"obsidian","Dirt":"dirt","Messy Dirt":"rooted_dirt","Rocky Dirt":"coarse_dirt","Grass Block":"grass_block","Sand":"sand","Red Sand":"red_sand","Gravel":"gravel","Clay":"clay","Snow":"snow_block","Ice":"ice","Water":"water","Lava":"lava","Cobweb":"cobweb","Net":"cobweb","Tall Grass":"tall_grass","Vines":"vine","Yellowstone":"end_stone","Magma":"magma_block","Green Stone":"prismarine","Green Bricks":"prismarine_bricks","Dark Green Bricks":"dark_prismarine","Ice Bricks":"blue_ice","Tilled Soil":"farmland","Useless Soil":"podzol","Workbench":"crafting_table","Furnace":"furnace","Chest":"chest","Loot Chest":"chest","Moonstone Chest":"ender_chest","Potion Table":"brewing_stand","Bookshelf":"bookshelf","Board":"oak_sign","Beacon":"beacon","Golden Decoration":"glowstone","Moonstone Explosive":"tnt","Bedrock":"bedrock","Invisible Solid":"barrier","Block of Quartz":"quartz_block","Chiseled Block of Quartz":"chiseled_quartz_block","Dark Red Brick":"red_nether_bricks","Dark Red Stone":"netherrack","Sponge":"sponge","Protector":"diamond_block","Hay Bale":"hay_block","Pumpkin":"pumpkin","Carved Pumpkin":"carved_pumpkin","Jack o'Lantern":"jack_o_lantern","Red Mushroom":"red_mushroom","Red Mushroom Block":"red_mushroom_block","Brown Mushroom":"brown_mushroom","Brown Mushroom Block":"brown_mushroom_block","Mushroom Stem":"mushroom_stem","Wheat":"wheat","Cranberries":"sweet_berry_bush","Autumn Maple Leaves":"oak_leaves","Fallen Maple Leaves":"oak_leaves","Fallen Cherry Leaves":"cherry_leaves"};
+
+// ─── Bloxd numeric ID → bloxd name mapping (idToNameJson, trimmed) ──────────
+const ID2NAME = {0:"Air",1:"Air",2:"Dirt",3:"Messy Dirt",4:"Grass Block",5:"Sand",6:"Clay",7:"Gravel",8:"Snow",9:"Maple Log",10:"Pine Log",11:"Plum Log",12:"Cedar Log",13:"Aspen Log",14:"Elm Log",15:"Maple Wood Planks",16:"Aspen Wood Planks",17:"Plum Wood Planks",18:"Elm Wood Planks",19:"Pine Wood Planks",20:"Cedar Wood Planks",21:"Barkless Maple Log",22:"Barkless Aspen Log",23:"Barkless Plum Log",24:"Barkless Elm Log",25:"Barkless Pine Log",26:"Barkless Cedar Log",28:"Stone",29:"Messy Stone",31:"Smooth Stone",32:"Diorite",33:"Smooth Diorite",34:"Andesite",35:"Smooth Andesite",36:"Granite",37:"Smooth Granite",38:"Sandstone",39:"Yellowstone",40:"Coal Ore",41:"Iron Ore",42:"Gold Ore",43:"Lapis Lazuli Ore",44:"Emerald Ore",45:"Diamond Ore",46:"Block of Coal",47:"Block of Iron",48:"Block of Gold",49:"Block of Lapis Lazuli",50:"Block of Emerald",51:"White Wool",52:"Orange Wool",53:"Magenta Wool",54:"Light Blue Wool",55:"Yellow Wool",56:"Lime Wool",57:"Pink Wool",58:"Gray Wool",59:"Light Gray Wool",60:"Cyan Wool",61:"Purple Wool",62:"Blue Wool",63:"Brown Wool",64:"Green Wool",65:"Red Wool",66:"Black Wool",67:"Baked Clay",68:"White Baked Clay",69:"Orange Baked Clay",70:"Magenta Baked Clay",71:"Light Blue Baked Clay",72:"Yellow Baked Clay",73:"Lime Baked Clay",74:"Pink Baked Clay",75:"Gray Baked Clay",76:"Light Gray Baked Clay",77:"Cyan Baked Clay",78:"Purple Baked Clay",79:"Blue Baked Clay",80:"Brown Baked Clay",81:"Green Baked Clay",82:"Red Baked Clay",83:"Black Baked Clay",84:"Gray Concrete",85:"Light Gray Concrete",86:"Black Concrete",87:"Blue Concrete",88:"Brown Concrete",89:"Cyan Concrete",90:"Light Blue Concrete",91:"Lime Concrete",92:"Magenta Concrete",93:"Orange Concrete",94:"Pink Concrete",95:"Purple Concrete",96:"Red Concrete",97:"White Concrete",98:"Green Concrete",99:"Yellow Concrete",100:"Glass",101:"White Glass",102:"Orange Glass",103:"Magenta Glass",104:"Light Blue Glass",105:"Yellow Glass",106:"Lime Glass",107:"Pink Glass",108:"Gray Glass",109:"Light Gray Glass",110:"Cyan Glass",111:"Purple Glass",112:"Blue Glass",113:"Brown Glass",114:"Green Glass",115:"Red Glass",116:"Black Glass",117:"Obsidian",118:"Ice",119:"Bricks",120:"Block of Diamond",121:"Block of Quartz",122:"Engraved Stone",123:"Stone Bricks",124:"Mossy Stone Bricks",125:"Cracked Stone Bricks",126:"Smooth Red Sandstone",127:"Red Sandstone",128:"Smooth Sandstone",129:"Engraved Sandstone",130:"Sandstone Bricks",131:"Cobweb",132:"Vines",133:"Tall Grass",134:"Red Mushroom",135:"Brown Mushroom",136:"Red Mushroom Block",137:"Brown Mushroom Block",138:"Mushroom Stem",139:"Yellowstone",140:"Magma",141:"Green Stone",142:"Green Bricks",143:"Dark Green Bricks",144:"Ice Bricks",145:"Beacon",146:"Golden Decoration",147:"Bedrock",148:"Sponge",149:"Invisible Solid",150:"Dark Red Brick",151:"Dark Red Stone",152:"Tilled Soil",153:"Useless Soil",154:"Lava",155:"Water",156:"Wheat",157:"Pumpkin",158:"Carved Pumpkin","Jack o'Lantern":159,160:"Workbench",161:"Furnace",162:"Chest",163:"Loot Chest",164:"Moonstone Chest",165:"Potion Table",166:"Bookshelf",167:"Board",168:"Moonstone Explosive",169:"Chiseled Block of Quartz",170:"Hay Bale",171:"Cranberries",172:"Snow",200:"White Carpet",201:"Orange Carpet",202:"Magenta Carpet",203:"Light Blue Carpet",204:"Yellow Carpet",205:"Lime Carpet",206:"Pink Carpet",207:"Gray Carpet",208:"Light Gray Carpet",209:"Cyan Carpet",210:"Purple Carpet",211:"Blue Carpet",212:"Brown Carpet",213:"Green Carpet",214:"Red Carpet",215:"Black Carpet",220:"Dirt Slab",221:"Grass Slab",222:"Stone Slab",223:"Smooth Stone Slab",224:"Stone Bricks Slab",225:"Sandstone Slab",226:"Smooth Sandstone Slab",227:"Red Sandstone Slab",228:"Smooth Red Sandstone Slab",229:"Bricks Slab",230:"Messy Stone Slab",231:"Mossy Stone Slab",232:"Mossy Stone Bricks Slab",233:"Andesite Slab",234:"Smooth Andesite Slab",235:"Diorite Slab",236:"Smooth Diorite Slab",237:"Granite Slab",238:"Smooth Granite Slab",250:"Maple Slab",251:"Pine Slab",252:"Plum Slab",253:"Cedar Slab",254:"Aspen Slab",255:"Elm Slab",260:"Maple Leaves",261:"Pine Leaves",262:"Plum Leaves",263:"Cedar Leaves",264:"Aspen Leaves",265:"Elm Leaves",266:"Autumn Maple Leaves",267:"Fallen Maple Leaves",268:"Fallen Cherry Leaves",270:"Maple Sapling",271:"Pine Sapling",272:"Plum Sapling",273:"Cedar Sapling",274:"Aspen Sapling",275:"Elm Sapling",280:"Maple Door",281:"Pine Door",282:"Plum Door",283:"Cedar Door",284:"Aspen Door",285:"Elm Door",290:"Maple Trapdoor",291:"Pine Trapdoor",292:"Plum Trapdoor",293:"Cedar Trapdoor",294:"Aspen Trapdoor",295:"Elm Trapdoor",300:"Maple Ladder",301:"Pine Ladder",302:"Plum Ladder",303:"Cedar Ladder",304:"Aspen Ladder",305:"Elm Ladder",310:"Cherry Log",311:"Cherry Wood Planks",312:"Cherry Leaves",313:"Cherry Door",314:"Cherry Trapdoor",315:"Cherry Sapling",316:"Cherry Slab",317:"Barkless Cherry Log",318:"Cherry Ladder",320:"Palm Log",321:"Palm Wood Planks",322:"Palm Leaves",323:"Palm Door",324:"Palm Trapdoor",325:"Palm Sapling",326:"Palm Slab",327:"Barkless Palm Log",400:"White Bed",401:"Orange Bed",402:"Magenta Bed",403:"Light Blue Bed",404:"Yellow Bed",405:"Lime Bed",406:"Pink Bed",407:"Gray Bed",408:"Light Gray Bed",409:"Cyan Bed",410:"Purple Bed",411:"Blue Bed",412:"Brown Bed",413:"Green Bed",414:"Red Bed",415:"Black Bed"};
+
+// ─── MC name → legacy numeric block ID (for .schematic format) ──────────────
+// These are Minecraft 1.12 numeric IDs used by MCEdit .schematic format
+const MC_NAME_TO_LEGACY_ID = {
+  air:0,stone:1,granite:1,polished_granite:1,diorite:1,polished_diorite:1,andesite:1,polished_andesite:1,
+  grass_block:2,dirt:3,coarse_dirt:3,podzol:3,cobblestone:4,oak_planks:5,spruce_planks:5,birch_planks:5,
+  jungle_planks:5,acacia_planks:5,dark_oak_planks:5,cherry_planks:5,bedrock:7,water:9,lava:11,
+  sand:12,red_sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,oak_log:17,spruce_log:17,
+  birch_log:17,jungle_log:17,acacia_log:162,dark_oak_log:162,cherry_log:17,
+  stripped_oak_log:17,stripped_spruce_log:17,stripped_birch_log:17,stripped_jungle_log:17,
+  stripped_acacia_log:162,stripped_dark_oak_log:162,stripped_cherry_log:17,
+  oak_leaves:18,spruce_leaves:18,birch_leaves:18,jungle_leaves:18,acacia_leaves:161,dark_oak_leaves:161,cherry_leaves:18,
+  sponge:19,wet_sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,
+  smooth_sandstone:24,chiseled_sandstone:24,cut_sandstone:24,noteblock:25,white_bed:26,red_bed:26,
+  orange_bed:26,yellow_bed:26,lime_bed:26,green_bed:26,blue_bed:26,cyan_bed:26,
+  light_blue_bed:26,magenta_bed:26,pink_bed:26,gray_bed:26,light_gray_bed:26,
+  brown_bed:26,purple_bed:26,black_bed:26,cobweb:30,grass:31,fern:31,dead_bush:32,
+  piston:33,white_wool:35,orange_wool:35,magenta_wool:35,light_blue_wool:35,yellow_wool:35,
+  lime_wool:35,pink_wool:35,gray_wool:35,light_gray_wool:35,cyan_wool:35,purple_wool:35,
+  blue_wool:35,brown_wool:35,green_wool:35,red_wool:35,black_wool:35,
+  dandelion:37,poppy:38,blue_orchid:38,allium:38,azure_bluet:38,oxeye_daisy:38,
+  brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,sandstone_slab:44,
+  cobblestone_slab:44,bricks:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,
+  torch:50,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,
+  wheat:59,farmland:60,furnace:61,oak_sign:63,oak_door:64,spruce_door:64,birch_door:64,
+  jungle_door:64,acacia_door:64,dark_oak_door:64,cherry_door:64,ladder:65,rail:66,
+  cobblestone_stairs:67,oak_wall_sign:68,lever:69,stone_pressure_plate:70,
+  iron_door:71,oak_pressure_plate:72,redstone_ore:73,redstone_torch:76,
+  stone_button:77,snow:78,ice:79,snow_block:80,cactus:81,clay:82,
+  sugar_cane:83,jukebox:84,oak_fence:85,pumpkin:86,netherrack:87,soul_sand:88,
+  glowstone:89,jack_o_lantern:91,white_stained_glass:95,orange_stained_glass:95,
+  magenta_stained_glass:95,light_blue_stained_glass:95,yellow_stained_glass:95,
+  lime_stained_glass:95,pink_stained_glass:95,gray_stained_glass:95,
+  light_gray_stained_glass:95,cyan_stained_glass:95,purple_stained_glass:95,
+  blue_stained_glass:95,brown_stained_glass:95,green_stained_glass:95,
+  red_stained_glass:95,black_stained_glass:95,vine:106,oak_fence_gate:107,
+  brick_stairs:108,stone_brick_stairs:109,mycelium:110,lily_pad:111,
+  nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,
+  enchanting_table:116,brewing_stand:117,end_portal_frame:120,end_stone:121,
+  redstone_lamp:123,oak_slab:126,spruce_slab:126,birch_slab:126,jungle_slab:126,
+  acacia_slab:126,dark_oak_slab:126,cherry_slab:126,stone_brick_slab:44,
+  cobblestone_wall:139,mossy_cobblestone_wall:139,carrot:141,potato:142,
+  oak_button:143,spruce_button:143,birch_button:143,skull:144,
+  anvil:145,trapped_chest:146,heavy_weighted_pressure_plate:148,
+  light_weighted_pressure_plate:147,daylight_detector:151,redstone_block:152,
+  quartz_ore:153,quartz_block:155,chiseled_quartz_block:155,
+  quartz_pillar:155,quartz_stairs:156,activator_rail:157,dropper:158,
+  white_terracotta:159,orange_terracotta:159,magenta_terracotta:159,
+  light_blue_terracotta:159,yellow_terracotta:159,lime_terracotta:159,
+  pink_terracotta:159,gray_terracotta:159,light_gray_terracotta:159,
+  cyan_terracotta:159,purple_terracotta:159,blue_terracotta:159,
+  brown_terracotta:159,green_terracotta:159,red_terracotta:159,
+  black_terracotta:159,terracotta:172,
+  white_carpet:171,orange_carpet:171,magenta_carpet:171,light_blue_carpet:171,
+  yellow_carpet:171,lime_carpet:171,pink_carpet:171,gray_carpet:171,
+  light_gray_carpet:171,cyan_carpet:171,purple_carpet:171,blue_carpet:171,
+  brown_carpet:171,green_carpet:171,red_carpet:171,black_carpet:171,
+  sunflower:175,lilac:175,tall_grass:175,large_fern:175,rose_bush:175,peony:175,
+  white_glazed_terracotta:235,orange_glazed_terracotta:235,magenta_glazed_terracotta:235,
+  light_blue_glazed_terracotta:235,yellow_glazed_terracotta:235,lime_glazed_terracotta:235,
+  pink_glazed_terracotta:235,gray_glazed_terracotta:235,light_gray_glazed_terracotta:235,
+  cyan_glazed_terracotta:235,purple_glazed_terracotta:235,blue_glazed_terracotta:235,
+  brown_glazed_terracotta:235,green_glazed_terracotta:235,red_glazed_terracotta:235,
+  black_glazed_terracotta:235,
+  white_concrete:236,orange_concrete:236,magenta_concrete:236,light_blue_concrete:236,
+  yellow_concrete:236,lime_concrete:236,pink_concrete:236,gray_concrete:236,
+  light_gray_concrete:236,cyan_concrete:236,purple_concrete:236,blue_concrete:236,
+  brown_concrete:236,green_concrete:236,red_concrete:236,black_concrete:236,
+  white_concrete_powder:237,orange_concrete_powder:237,magenta_concrete_powder:237,
+  stone_bricks:98,mossy_stone_bricks:98,cracked_stone_bricks:98,chiseled_stone_bricks:98,
+  smooth_stone:43,red_sandstone:179,smooth_red_sandstone:179,chiseled_red_sandstone:179,
+  cut_red_sandstone:179,red_sandstone_stairs:180,red_sandstone_slab:182,
+  oak_trapdoor:96,spruce_trapdoor:96,birch_trapdoor:96,jungle_trapdoor:96,
+  acacia_trapdoor:96,dark_oak_trapdoor:96,cherry_trapdoor:96,
+  magma_block:213,red_nether_bricks:215,bone_block:216,observer:218,
+  prismarine:168,prismarine_bricks:168,dark_prismarine:168,blue_ice:174,
+  sea_lantern:169,hay_block:170,coal_block:173,packed_ice:174,
+  barrier:0,
+  rooted_dirt:3,sweet_berry_bush:37,loom:58,smithing_table:58,
+  attached_pumpkin_stem:86,melon_stem:105,pumpkin_stem:105,melon:103,
+  red_mushroom_block:100,brown_mushroom_block:99,mushroom_stem:100
+};
+
+// ─── Parse .bloxdschem (Avro format) ────────────────────────────────────────
+function readVarInt(buf, offset) {
+  let value = 0, shift = 0;
+  while (true) {
+    const byte = buf[offset++];
+    value |= (byte & 0x7F) << shift;
+    shift += 7;
+    if (!(byte & 0x80)) break;
+  }
+  return { value, offset };
+}
+
+function readZigZag(buf, offset) {
+  const r = readVarInt(buf, offset);
+  const n = r.value;
+  return { value: (n >>> 1) ^ -(n & 1), offset: r.offset };
+}
+
+function readString(buf, offset) {
+  const len = readVarInt(buf, offset);
+  offset = len.offset;
+  const bytes = buf.slice(offset, offset + len.value);
+  return { value: new TextDecoder().decode(bytes), offset: offset + len.value };
+}
+
+function readBytes(buf, offset) {
+  const len = readVarInt(buf, offset);
+  offset = len.offset;
+  return { value: buf.slice(offset, offset + len.value), offset: offset + len.value };
+}
+
+function parseBloxdschem(buf) {
+  let offset = 0;
+
+  // The .bloxdschem has a 4-byte header fixed field, then the data
+  // Schema (i): headers(fixed4), name(string), x,y,z,sizeX,sizeY,sizeZ(int),
+  //             chunks(array of {x,y,z,blocks(bytes)}), blockdatas(...), globalX,Y,Z, wtvthisis(fixed2)
+  // We decode using the resolver: reads as schema (a): name,x,y,z,sizeX,sizeY,sizeZ,chunks
+
+  // Skip 4-byte header
+  offset += 4;
+
+  const nameR = readString(buf, offset); offset = nameR.offset;
+  const xR = readZigZag(buf, offset); offset = xR.offset;
+  const yR = readZigZag(buf, offset); offset = yR.offset;
+  const zR = readZigZag(buf, offset); offset = zR.offset;
+  const sizeXR = readZigZag(buf, offset); offset = sizeXR.offset;
+  const sizeYR = readZigZag(buf, offset); offset = sizeYR.offset;
+  const sizeZR = readZigZag(buf, offset); offset = sizeZR.offset;
+
+  // Read chunks array: Avro arrays use block-count encoding
+  const chunks = [];
+  while (true) {
+    const countR = readZigZag(buf, offset); offset = countR.offset;
+    const count = countR.value;
+    if (count === 0) break;
+    const n = count < 0 ? -count : count;
+    if (count < 0) { const sizeR = readVarInt(buf, offset); offset = sizeR.offset; }
+    for (let i = 0; i < n; i++) {
+      const cxR = readZigZag(buf, offset); offset = cxR.offset;
+      const cyR = readZigZag(buf, offset); offset = cyR.offset;
+      const czR = readZigZag(buf, offset); offset = czR.offset;
+      const blocksR = readBytes(buf, offset); offset = blocksR.offset;
+      chunks.push({ x: cxR.value, y: cyR.value, z: czR.value, blocks: blocksR.value });
+    }
+  }
+
+  return {
+    name: nameR.value,
+    pos: [xR.value, yR.value, zR.value],
+    size: [sizeXR.value, sizeYR.value, sizeZR.value],
+    chunks
+  };
+}
+
+// ─── Decode RLE block data from each chunk ──────────────────────────────────
+function decodeChunkBlocks(rawBlocks) {
+  const decoded = [];
+  let l = 0;
+  function readVarIntLocal() {
+    let v = 0, e = 0;
+    while (true) {
+      const r = rawBlocks[l++];
+      v |= (r & 127) << e;
+      e += 7;
+      if (r & 128 ? false : true) break;
+    }
+    return v;
+  }
+  while (l < rawBlocks.length) {
+    const count = readVarIntLocal();
+    const blockId = readVarIntLocal();
+    for (let i = 0; i < count; i++) decoded.push(blockId);
+  }
+  return decoded;
+}
+
+// ─── Convert bloxd block ID → MC legacy numeric ID ──────────────────────────
+function bloxdIdToLegacy(bloxdId) {
+  const name = ID2NAME[bloxdId];
+  if (!name || name === 'Air') return 0;
+  const mcName = B2M[name];
+  if (!mcName) return 0;
+  return MC_NAME_TO_LEGACY_ID[mcName] ?? 0;
+}
+
+// ─── Build 3D block array from chunks ───────────────────────────────────────
+function buildBlockArray(parsed) {
+  const [sX, sY, sZ] = parsed.size;
+  const totalBlocks = sX * sY * sZ;
+  const blocks = new Uint8Array(totalBlocks);   // block IDs
+  const data   = new Uint8Array(totalBlocks);   // block data (all 0)
+
+  for (const chunk of parsed.chunks) {
+    const rawDecoded = decodeChunkBlocks(chunk.blocks);
+    // Chunk coords in 32-block units
+    const cxBase = chunk.x * 32;
+    const cyBase = chunk.y * 32;
+    const czBase = chunk.z * 32;
+
+    // Bloxd internal chunk order: blocks[y*32*32 + z*32 + x] (from bloxdJSONtoMc indexing)
+    // The bloxdJSONtoMc function uses: index = (y*1024) + x*32 + z  (iterate x outer, y middle, z inner)
+    // But from the original parseBloxdschem, blocks are pushed sequentially, meaning
+    // the RLE decoded array is indexed as blocks[y][z][x] in chunk-local space
+    // Looking at writeBloxdschem: it iterates chunks[o].blocks and does RLE,
+    // and in bloxdJSONtoMc, u.blocks[a + 1024*t] where t is the x-loop, a = i(localPos,[32,32,32])
+    // i(e,t) = e[0]*t[1]*t[2] + e[1]*t[2] + e[2]  => x*1024 + y*32 + z
+    // So chunk block index = x*1024 + y*32 + z (local coords)
+
+    for (let lx = 0; lx < 32; lx++) {
+      for (let ly = 0; ly < 32; ly++) {
+        for (let lz = 0; lz < 32; lz++) {
+          const chunkIdx = lx * 1024 + ly * 32 + lz;
+          const bloxdId = rawDecoded[chunkIdx] ?? 0;
+
+          const wx = cxBase + lx;
+          const wy = cyBase + ly;
+          const wz = czBase + lz;
+
+          if (wx >= sX || wy >= sY || wz >= sZ) continue;
+
+          // .schematic format index: y*length*width + z*width + x
+          // where Width=sX, Height=sY, Length=sZ
+          const schIdx = wy * sZ * sX + wz * sX + wx;
+          blocks[schIdx] = bloxdIdToLegacy(bloxdId);
+        }
+      }
+    }
+  }
+  return { blocks, data };
+}
+
+// ─── Write NBT for legacy MCEdit .schematic ──────────────────────────────────
+// NBT tag types
+const TAG = { END:0, BYTE:1, SHORT:2, INT:3, LONG:4, FLOAT:5, DOUBLE:6,
+              BYTE_ARRAY:7, STRING:8, LIST:9, COMPOUND:10, INT_ARRAY:11 };
+
+function writeNBT(name, type, value) {
+  const nameBuf = encodeString(name);
+  const payload = encodePayload(type, value);
+  const out = new Uint8Array(1 + nameBuf.length + payload.length);
+  out[0] = type;
+  out.set(nameBuf, 1);
+  out.set(payload, 1 + nameBuf.length);
+  return out;
+}
+
+function encodeString(str) {
+  const encoded = new TextEncoder().encode(str);
+  const buf = new Uint8Array(2 + encoded.length);
+  buf[0] = (encoded.length >> 8) & 0xff;
+  buf[1] = encoded.length & 0xff;
+  buf.set(encoded, 2);
+  return buf;
+}
+
+function encodePayload(type, value) {
+  switch (type) {
+    case TAG.BYTE: { const b = new Uint8Array(1); b[0] = value & 0xff; return b; }
+    case TAG.SHORT: { const b = new Uint8Array(2); new DataView(b.buffer).setInt16(0, value, false); return b; }
+    case TAG.INT: { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, value, false); return b; }
+    case TAG.STRING: return encodeString(value);
+    case TAG.BYTE_ARRAY: {
+      const len = new Uint8Array(4);
+      new DataView(len.buffer).setInt32(0, value.length, false);
+      const b = new Uint8Array(4 + value.length);
+      b.set(len); b.set(value, 4);
+      return b;
+    }
+    case TAG.LIST: {
+      // value = { type, items[] }
+      const itemType = value.type;
+      const items = value.items;
+      const header = new Uint8Array(5);
+      header[0] = itemType;
+      new DataView(header.buffer).setInt32(1, items.length, false);
+      const parts = [header];
+      for (const item of items) parts.push(encodePayload(itemType, item));
+      return concat(parts);
+    }
+    case TAG.COMPOUND: {
+      // value = array of {name, type, value}
+      const parts = [];
+      for (const tag of value) parts.push(writeNBT(tag.name, tag.type, tag.value));
+      parts.push(new Uint8Array([TAG.END])); // end tag
+      return concat(parts);
+    }
+    default: throw new Error('Unknown NBT type: ' + type);
+  }
+}
+
+function concat(arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const a of arrays) { out.set(a, offset); offset += a.length; }
+  return out;
+}
+
+function buildSchematicNBT(width, height, length, blocks, data, name) {
+  // Root compound tag named "Schematic"
+  const rootPayload = encodePayload(TAG.COMPOUND, [
+    { name: "Width",       type: TAG.SHORT,      value: width },
+    { name: "Height",      type: TAG.SHORT,      value: height },
+    { name: "Length",      type: TAG.SHORT,      value: length },
+    { name: "Materials",   type: TAG.STRING,     value: "Alpha" },
+    { name: "Blocks",      type: TAG.BYTE_ARRAY, value: blocks },
+    { name: "Data",        type: TAG.BYTE_ARRAY, value: data },
+    { name: "Entities",    type: TAG.LIST,       value: { type: TAG.COMPOUND, items: [] } },
+    { name: "TileEntities",type: TAG.LIST,       value: { type: TAG.COMPOUND, items: [] } },
+  ]);
+
+  const rootName = encodeString("Schematic");
+  const out = new Uint8Array(1 + rootName.length + rootPayload.length);
+  out[0] = TAG.COMPOUND;
+  out.set(rootName, 1);
+  out.set(rootPayload, 1 + rootName.length);
+  return out;
+}
+
+// ─── GZip compress ───────────────────────────────────────────────────────────
+async function gzipCompress(data) {
+  const stream = new CompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  writer.write(data);
+  writer.close();
+  const chunks = [];
+  const reader = stream.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  return concat(chunks);
+}
+
+// ─── Download helper ─────────────────────────────────────────────────────────
+function downloadBin(data, filename) {
+  const blob = new Blob([data], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ─── Main entry ──────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const status = document.getElementById('status');
+  const err = document.getElementById('err');
+  err.textContent = '';
+  status.textContent = 'Reading file...';
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const baseName = file.name.replace(/\.bloxdschem$/i, '');
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buf = new Uint8Array(arrayBuffer);
+
+    status.textContent = 'Parsing .bloxdschem...';
+    const parsed = parseBloxdschem(buf);
+    const [sX, sY, sZ] = parsed.size;
+    console.log('Parsed:', parsed.name, 'size:', sX, sY, sZ, 'chunks:', parsed.chunks.length);
+
+    status.textContent = 'Building block array...';
+    const { blocks, data } = buildBlockArray(parsed);
+
+    status.textContent = 'Writing .schematic NBT...';
+    const nbtRaw = buildSchematicNBT(sX, sY, sZ, blocks, data, parsed.name);
+
+    status.textContent = 'Compressing...';
+    const compressed = await gzipCompress(nbtRaw);
+
+    status.textContent = 'Downloading...';
+    downloadBin(compressed, `${baseName}.schematic`);
+    status.textContent = `✓ Done! Saved as ${baseName}.schematic`;
+  } catch (ex) {
+    status.textContent = '';
+    err.textContent = 'Error: ' + ex.message;
+    console.error(ex);
+  }
+});
+</script>
+</body>
+</html>
